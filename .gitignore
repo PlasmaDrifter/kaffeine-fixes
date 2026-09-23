@@ -19,7 +19,6 @@ i18n/
 install/
 install_manifest.txt
 moc*.cpp
-patches/
 src/kaffeine
 src/kaffeine.qrc.depends
 src/qrc_kaffeine.cpp

@@ -1,0 +1,230 @@
+diff --git a/src/dvb/dvbchannel.cpp b/src/dvb/dvbchannel.cpp
+index 164cca4..d19cd14 100644
+--- a/src/dvb/dvbchannel.cpp
++++ b/src/dvb/dvbchannel.cpp
+@@ -524,7 +524,9 @@ void DvbChannelModel::dndMoveChannels(const QList<DvbSharedChannel> &selectedCha
+ 	int currentNumber = 1;
+ 
+ 	if (it != channelNumbers.constBegin()) {
+-		currentNumber = (std::prev(it, -1).key() + 1);
++		auto prevIt = it;
++		--prevIt;
++		currentNumber = (prevIt.key() + 1);
+ 	}
+ 
+ 	while (!channelQueue.isEmpty()) {
+diff --git a/src/dvb/dvbconfigdialog.cpp b/src/dvb/dvbconfigdialog.cpp
+index 9a75cb1..17bef3c 100644
+--- a/src/dvb/dvbconfigdialog.cpp
++++ b/src/dvb/dvbconfigdialog.cpp
+@@ -134,6 +134,13 @@ DvbConfigDialog::DvbConfigDialog(DvbManager *manager_, QWidget *parent) : QDialo
+ 	endMarginBox->setValue(manager->getEndMargin() / 60);
+ 	gridLayout->addWidget(endMarginBox, line++, 1);
+ 
++	gridLayout->addWidget(new QLabel(i18n("EPG time offset (hours):")), line, 0);
++
++	epgTimeOffsetBox = new QSpinBox(widget);
++	epgTimeOffsetBox->setRange(-12, 12);
++	epgTimeOffsetBox->setValue(manager->getEpgTimeOffset());
++	gridLayout->addWidget(epgTimeOffsetBox, line++, 1);
++
+ 	gridLayout->addWidget(new QLabel(i18n("Naming style for recordings:")), line, 0);
+ 
+ 	namingFormat = new QLineEdit(widget);
+@@ -577,6 +584,7 @@ void DvbConfigDialog::accept()
+ 	manager->setActionAfterRecording(actionAfterRecordingLineEdit->text());
+ 	manager->setBeginMargin(beginMarginBox->value() * 60);
+ 	manager->setEndMargin(endMarginBox->value() * 60);
++	manager->setEpgTimeOffset(epgTimeOffsetBox->value());
+ 	manager->setOverride6937Charset(override6937CharsetBox->isChecked());
+ 	manager->setCreateInfoFile(createInfoFileBox->isChecked());
+ 	manager->setDisableEpg(disableEpgBox->isChecked());
+diff --git a/src/dvb/dvbconfigdialog.h b/src/dvb/dvbconfigdialog.h
+index 21994ea..047ec20 100644
+--- a/src/dvb/dvbconfigdialog.h
++++ b/src/dvb/dvbconfigdialog.h
+@@ -104,6 +104,7 @@ private:
+ 	QLineEdit *xmltvFileNameEdit;
+ 	QSpinBox *beginMarginBox;
+ 	QSpinBox *endMarginBox;
++	QSpinBox *epgTimeOffsetBox;
+ 	QLineEdit *namingFormat;
+ 	QCheckBox *override6937CharsetBox;
+ 	QCheckBox *createInfoFileBox;
+diff --git a/src/dvb/dvbdevice_linux.cpp b/src/dvb/dvbdevice_linux.cpp
+index ccba92d..273e1a6 100644
+--- a/src/dvb/dvbdevice_linux.cpp
++++ b/src/dvb/dvbdevice_linux.cpp
+@@ -98,7 +98,7 @@ bool DvbLinuxDevice::isReady() const
+ void DvbLinuxDevice::startDevice(const QString &deviceId_)
+ {
+ 	Q_ASSERT(!ready);
+-	struct dvb_v5_fe_parms *parms = dvb_fe_open2(adapter, index, verbose, 0, dvbv5_log);
++	struct dvb_v5_fe_parms *parms = dvb_fe_open_flags(adapter, index, verbose, 0, dvbv5_log, O_RDWR | O_CLOEXEC);
+ 
+ 	if (!parms) {
+ 		qCWarning(logDev, "Cannot open frontend %s", qPrintable(frontendPath));
+@@ -267,7 +267,7 @@ void DvbLinuxDevice::setDeviceEnabled(bool enabled_)
+ bool DvbLinuxDevice::acquire()
+ {
+ 	Q_ASSERT(enabled && (!dvbv5_parms) && (dvrFd < 0));
+-	dvbv5_parms = dvb_fe_open2(adapter, index, verbose, 0, dvbv5_log);
++	dvbv5_parms = dvb_fe_open_flags(adapter, index, verbose, 0, dvbv5_log, O_RDWR | O_CLOEXEC);
+ 
+ 	if (!dvbv5_parms) {
+ 		qCWarning(logDev, "Cannot open frontend %s", qPrintable(frontendPath));
+diff --git a/src/dvb/dvbepg.cpp b/src/dvb/dvbepg.cpp
+index 575bc3f..dd9fa82 100644
+--- a/src/dvb/dvbepg.cpp
++++ b/src/dvb/dvbepg.cpp
+@@ -1062,6 +1062,9 @@ void DvbEpgFilter::processSection(const char *data, int size)
+ 		else
+ 			epgEntry.begin = QDateTime(QDate::fromJulianDay(entry.startDate() + 2400001),
+ 						   bcdToTime(entry.startTime()), Qt::UTC);
++		if (manager->getEpgTimeOffset() != 0) {
++			epgEntry.begin = epgEntry.begin.addSecs(manager->getEpgTimeOffset() * 3600);
++		}
+ 		epgEntry.duration = bcdToTime(entry.duration());
+ 
+ 		for (DvbDescriptor descriptor = entry.descriptors(); descriptor.isValid();
+@@ -1140,9 +1143,9 @@ void AtscEpgEttFilter::processSection(const char *data, int size)
+ 	epgFilter->processEttSection(data, size);
+ }
+ 
+-AtscEpgFilter::AtscEpgFilter(DvbManager *manager, DvbDevice *device_,
++AtscEpgFilter::AtscEpgFilter(DvbManager *manager_, DvbDevice *device_,
+ 	const DvbSharedChannel &channel) : device(device_), mgtFilter(this), eitFilter(this),
+-	ettFilter(this)
++	ettFilter(this), manager(manager_)
+ {
+ 	source = channel->source;
+ 	transponder = channel->transponder;
+@@ -1280,6 +1283,7 @@ void AtscEpgFilter::processEitSection(const char *data, int size)
+ 	int entryCount = eitSection.entryCount();
+ 	// 1980-01-06T000000 minus 15 secs (= UTC - GPS in 2011)
+ 	QDateTime baseDateTime = QDateTime(QDate(1980, 1, 5), QTime(23, 59, 45), Qt::UTC);
++	int offsetSecs = manager->getEpgTimeOffset() * 3600;
+ 
+ 	AtscEitSectionEntry eitEntry = eitSection.entries();
+ 	for (int i = 0; i < entryCount; i++) {
+@@ -1287,7 +1291,7 @@ void AtscEpgFilter::processEitSection(const char *data, int size)
+ 			break;
+ 		DvbEpgEntry epgEntry;
+ 		epgEntry.channel = channel;
+-		epgEntry.begin = baseDateTime.addSecs(eitEntry.startTime());
++		epgEntry.begin = baseDateTime.addSecs(eitEntry.startTime() + offsetSecs);
+ 		epgEntry.duration = QTime(0, 0, 0).addSecs(eitEntry.duration());
+ 
+ 
+diff --git a/src/dvb/dvbepg_p.h b/src/dvb/dvbepg_p.h
+index 1b06635..0f6a449 100644
+--- a/src/dvb/dvbepg_p.h
++++ b/src/dvb/dvbepg_p.h
+@@ -116,6 +116,7 @@ private:
+ 
+ 	DvbChannelModel *channelModel;
+ 	DvbEpgModel *epgModel;
++	DvbManager *manager;
+ 	AtscEpgMgtFilter mgtFilter;
+ 	AtscEpgEitFilter eitFilter;
+ 	AtscEpgEttFilter ettFilter;
+diff --git a/src/dvb/dvbmanager.cpp b/src/dvb/dvbmanager.cpp
+index 4f7e46d..bc97836 100644
+--- a/src/dvb/dvbmanager.cpp
++++ b/src/dvb/dvbmanager.cpp
+@@ -370,6 +370,11 @@ int DvbManager::getEndMargin() const
+ 	return KSharedConfig::openConfig()->group("DVB").readEntry("EndMargin", 600);
+ }
+ 
++int DvbManager::getEpgTimeOffset() const
++{
++	return KSharedConfig::openConfig()->group("DVB").readEntry("EpgTimeOffset", 0);
++}
++
+ QString DvbManager::getNamingFormat() const
+ {
+ 	return KSharedConfig::openConfig()->group("DVB").readEntry("NamingFormat", "%title");
+@@ -442,6 +447,11 @@ void DvbManager::setEndMargin(int endMargin)
+ 	KSharedConfig::openConfig()->group("DVB").writeEntry("EndMargin", endMargin);
+ }
+ 
++void DvbManager::setEpgTimeOffset(int epgTimeOffset)
++{
++	KSharedConfig::openConfig()->group("DVB").writeEntry("EpgTimeOffset", epgTimeOffset);
++}
++
+ void DvbManager::setNamingFormat(QString namingFormat)
+ {
+ 	KSharedConfig::openConfig()->group("DVB").writeEntry("NamingFormat", namingFormat);
+diff --git a/src/dvb/dvbmanager.h b/src/dvb/dvbmanager.h
+index 0dd5d7f..5b09661 100644
+--- a/src/dvb/dvbmanager.h
++++ b/src/dvb/dvbmanager.h
+@@ -136,6 +136,7 @@ public:
+ 	QString getActionAfterRecording() const;
+ 	int getBeginMargin() const; // seconds
+ 	int getEndMargin() const; // seconds
++	int getEpgTimeOffset() const; // hours
+ 	bool override6937Charset() const;
+ 	bool createInfoFile() const;
+ 	bool disableEpg() const;
+@@ -154,6 +155,7 @@ public:
+ 	void setActionAfterRecording(const QString actionAfterRecording);
+ 	void setBeginMargin(int beginMargin); // seconds
+ 	void setEndMargin(int endMargin); // seconds
++	void setEpgTimeOffset(int epgTimeOffset); // hours
+ 	void setOverride6937Charset(bool override);
+ 	void setCreateInfoFile(bool createInfoFile);
+ 	void setDisableEpg(bool disableEpg);
+diff --git a/src/main.cpp b/src/main.cpp
+index d13dfc7..b50924b 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -207,6 +207,12 @@ KaffeineApplication::~KaffeineApplication()
+ 
+ int main(int argc, char *argv[])
+ {
++	// Wayland fix: LibVLC cannot embed video into native Wayland surfaces.
++	// Force the X11 (xcb) platform backend under Wayland so LibVLC embeds video into the Kaffeine window.
++	if (qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM") && qEnvironmentVariableIsSet("WAYLAND_DISPLAY")) {
++		qputenv("QT_QPA_PLATFORM", "xcb");
++	}
++
+ 	qInstallMessageHandler(verboseMessageHandler);
+ 
+ 	KLocalizedString::setApplicationDomain("kaffeine");
+diff --git a/src/sqlinterface.h b/src/sqlinterface.h
+index fd1541d..f9c0691 100644
+--- a/src/sqlinterface.h
++++ b/src/sqlinterface.h
+@@ -84,19 +84,22 @@ public:
+ 
+ 	template<class Container> SqlKey sqlFindFreeKey(const Container &container) const
+ 	{
+-		SqlKey sqlKey(1);
++		quint32 maxKey = 0;
++		for (auto it = container.constBegin(); it != container.constEnd(); ++it) {
++			if (it.key().sqlKey > maxKey) {
++				maxKey = it.key().sqlKey;
++			}
++		}
+ 
+-		if (!container.isEmpty()) {
+-			sqlKey = SqlKey(std::prev(container.constEnd(), -1).key().sqlKey + 1);
++		SqlKey sqlKey(maxKey + 1);
+ 
+-			while (container.contains(sqlKey) || !sqlKey.isSqlKeyValid()) {
++		while (container.contains(sqlKey) || !sqlKey.isSqlKeyValid()) {
+ #if QT_VERSION >= 0x050a00
+-				quint32 rand = QRandomGenerator::global()->generate();
++			quint32 rand = QRandomGenerator::global()->generate();
+ #else
+-				quint32 rand = qrand();
++			quint32 rand = qrand();
+ #endif
+-				sqlKey = SqlKey(rand);
+-			}
++			sqlKey = SqlKey(rand);
+ 		}
+ 
+ 		return sqlKey;

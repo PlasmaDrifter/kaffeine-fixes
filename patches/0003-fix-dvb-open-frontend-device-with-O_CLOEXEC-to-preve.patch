@@ -1,0 +1,43 @@
+From 443c1d853f7e91f6bc4dca66e6401c21103e033e Mon Sep 17 00:00:00 2001
+From: PlasmaDrifter <118319137+PlasmaDrifter@users.noreply.github.com>
+Date: Tue, 22 Sep 2026 19:05:27 -0700
+Subject: [PATCH 3/4] fix(dvb): open frontend device with O_CLOEXEC to prevent
+ tuner lockups
+
+When Kaffeine triggers network downloads (e.g. updating scan data over internet),
+KIO spawns background worker helper processes (like kio_http_cache_cleaner).
+Because dvb_fe_open2() did not set O_CLOEXEC on the DVB frontend device,
+child processes inherited the tuner file descriptor. When KIO processes remained
+alive, /dev/dvb/adapterX/frontendY remained locked with EBUSY, causing Kaffeine
+to fail to acquire the tuner on subsequent tunes.
+
+Replace dvb_fe_open2() with dvb_fe_open_flags(..., O_RDWR | O_CLOEXEC).
+---
+ src/dvb/dvbdevice_linux.cpp | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/dvb/dvbdevice_linux.cpp b/src/dvb/dvbdevice_linux.cpp
+index ccba92d..273e1a6 100644
+--- a/src/dvb/dvbdevice_linux.cpp
++++ b/src/dvb/dvbdevice_linux.cpp
+@@ -98,7 +98,7 @@ bool DvbLinuxDevice::isReady() const
+ void DvbLinuxDevice::startDevice(const QString &deviceId_)
+ {
+ 	Q_ASSERT(!ready);
+-	struct dvb_v5_fe_parms *parms = dvb_fe_open2(adapter, index, verbose, 0, dvbv5_log);
++	struct dvb_v5_fe_parms *parms = dvb_fe_open_flags(adapter, index, verbose, 0, dvbv5_log, O_RDWR | O_CLOEXEC);
+ 
+ 	if (!parms) {
+ 		qCWarning(logDev, "Cannot open frontend %s", qPrintable(frontendPath));
+@@ -267,7 +267,7 @@ void DvbLinuxDevice::setDeviceEnabled(bool enabled_)
+ bool DvbLinuxDevice::acquire()
+ {
+ 	Q_ASSERT(enabled && (!dvbv5_parms) && (dvrFd < 0));
+-	dvbv5_parms = dvb_fe_open2(adapter, index, verbose, 0, dvbv5_log);
++	dvbv5_parms = dvb_fe_open_flags(adapter, index, verbose, 0, dvbv5_log, O_RDWR | O_CLOEXEC);
+ 
+ 	if (!dvbv5_parms) {
+ 		qCWarning(logDev, "Cannot open frontend %s", qPrintable(frontendPath));
+-- 
+2.55.0
+

@@ -1,0 +1,37 @@
+From d0ac411d6a14590dc68a881ac48d44c7a2827543 Mon Sep 17 00:00:00 2001
+From: PlasmaDrifter <118319137+PlasmaDrifter@users.noreply.github.com>
+Date: Tue, 22 Sep 2026 19:05:12 -0700
+Subject: [PATCH 2/4] fix(wayland): auto-switch to XCB backend under Wayland to
+ allow LibVLC embedding
+
+LibVLC 3.0 does not support embedding video into native Wayland surfaces via
+libvlc_media_player_set_xwindow(), causing video to detach and pop up in a
+separate floating window.
+
+When running inside a Wayland session without an explicit QT_QPA_PLATFORM set,
+automatically configure QT_QPA_PLATFORM=xcb before QApplication initialization
+so that Kaffeine runs under XWayland and embeds video cleanly.
+---
+ src/main.cpp | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/src/main.cpp b/src/main.cpp
+index d13dfc7..b50924b 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -207,6 +207,12 @@ KaffeineApplication::~KaffeineApplication()
+ 
+ int main(int argc, char *argv[])
+ {
++	// Wayland fix: LibVLC cannot embed video into native Wayland surfaces.
++	// Force the X11 (xcb) platform backend under Wayland so LibVLC embeds video into the Kaffeine window.
++	if (qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM") && qEnvironmentVariableIsSet("WAYLAND_DISPLAY")) {
++		qputenv("QT_QPA_PLATFORM", "xcb");
++	}
++
+ 	qInstallMessageHandler(verboseMessageHandler);
+ 
+ 	KLocalizedString::setApplicationDomain("kaffeine");
+-- 
+2.55.0
+

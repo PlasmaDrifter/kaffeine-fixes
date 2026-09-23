@@ -1,0 +1,69 @@
+From 13f54ea54b3b7ad1e2a7f98321d1bcc48adcca7d Mon Sep 17 00:00:00 2001
+From: PlasmaDrifter <118319137+PlasmaDrifter@users.noreply.github.com>
+Date: Tue, 22 Sep 2026 19:04:58 -0700
+Subject: [PATCH 1/4] fix(sql): prevent crash when adding DVB/ATSC channels
+
+Using std::prev(container.constEnd(), -1) stepped past the end of the container,
+returning a NULL pointer and causing an immediate SIGSEGV when dereferencing .key().
+Furthermore, Qt5's QMap::constEnd() sentinel node can fail on reverse stepping.
+
+Replace with safe forward traversal across the container to find maxKey, and
+safely decrement iterators using operator-- in dvbchannel.cpp.
+---
+ src/dvb/dvbchannel.cpp |  4 +++-
+ src/sqlinterface.h     | 19 +++++++++++--------
+ 2 files changed, 14 insertions(+), 9 deletions(-)
+
+diff --git a/src/dvb/dvbchannel.cpp b/src/dvb/dvbchannel.cpp
+index 164cca4..d19cd14 100644
+--- a/src/dvb/dvbchannel.cpp
++++ b/src/dvb/dvbchannel.cpp
+@@ -524,7 +524,9 @@ void DvbChannelModel::dndMoveChannels(const QList<DvbSharedChannel> &selectedCha
+ 	int currentNumber = 1;
+ 
+ 	if (it != channelNumbers.constBegin()) {
+-		currentNumber = (std::prev(it, -1).key() + 1);
++		auto prevIt = it;
++		--prevIt;
++		currentNumber = (prevIt.key() + 1);
+ 	}
+ 
+ 	while (!channelQueue.isEmpty()) {
+diff --git a/src/sqlinterface.h b/src/sqlinterface.h
+index fd1541d..f9c0691 100644
+--- a/src/sqlinterface.h
++++ b/src/sqlinterface.h
+@@ -84,19 +84,22 @@ public:
+ 
+ 	template<class Container> SqlKey sqlFindFreeKey(const Container &container) const
+ 	{
+-		SqlKey sqlKey(1);
++		quint32 maxKey = 0;
++		for (auto it = container.constBegin(); it != container.constEnd(); ++it) {
++			if (it.key().sqlKey > maxKey) {
++				maxKey = it.key().sqlKey;
++			}
++		}
+ 
+-		if (!container.isEmpty()) {
+-			sqlKey = SqlKey(std::prev(container.constEnd(), -1).key().sqlKey + 1);
++		SqlKey sqlKey(maxKey + 1);
+ 
+-			while (container.contains(sqlKey) || !sqlKey.isSqlKeyValid()) {
++		while (container.contains(sqlKey) || !sqlKey.isSqlKeyValid()) {
+ #if QT_VERSION >= 0x050a00
+-				quint32 rand = QRandomGenerator::global()->generate();
++			quint32 rand = QRandomGenerator::global()->generate();
+ #else
+-				quint32 rand = qrand();
++			quint32 rand = qrand();
+ #endif
+-				sqlKey = SqlKey(rand);
+-			}
++			sqlKey = SqlKey(rand);
+ 		}
+ 
+ 		return sqlKey;
+-- 
+2.55.0
+
