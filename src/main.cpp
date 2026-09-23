@@ -207,6 +207,12 @@ KaffeineApplication::~KaffeineApplication()
 
 int main(int argc, char *argv[])
 {
+	// Wayland fix: LibVLC cannot embed video into native Wayland surfaces.
+	// Force the X11 (xcb) platform backend under Wayland so LibVLC embeds video into the Kaffeine window.
+	if (qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM") && qEnvironmentVariableIsSet("WAYLAND_DISPLAY")) {
+		qputenv("QT_QPA_PLATFORM", "xcb");
+	}
+
 	qInstallMessageHandler(verboseMessageHandler);
 
 	KLocalizedString::setApplicationDomain("kaffeine");
