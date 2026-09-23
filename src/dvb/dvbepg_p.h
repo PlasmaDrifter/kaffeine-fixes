@@ -116,6 +116,7 @@ private:
 
 	DvbChannelModel *channelModel;
 	DvbEpgModel *epgModel;
+	DvbManager *manager;
 	AtscEpgMgtFilter mgtFilter;
 	AtscEpgEitFilter eitFilter;
 	AtscEpgEttFilter ettFilter;

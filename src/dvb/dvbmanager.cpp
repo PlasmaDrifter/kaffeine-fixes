@@ -370,6 +370,11 @@ int DvbManager::getEndMargin() const
 	return KSharedConfig::openConfig()->group("DVB").readEntry("EndMargin", 600);
 }
 
+int DvbManager::getEpgTimeOffset() const
+{
+	return KSharedConfig::openConfig()->group("DVB").readEntry("EpgTimeOffset", 0);
+}
+
 QString DvbManager::getNamingFormat() const
 {
 	return KSharedConfig::openConfig()->group("DVB").readEntry("NamingFormat", "%title");
@@ -440,6 +445,11 @@ void DvbManager::setBeginMargin(int beginMargin)
 void DvbManager::setEndMargin(int endMargin)
 {
 	KSharedConfig::openConfig()->group("DVB").writeEntry("EndMargin", endMargin);
+}
+
+void DvbManager::setEpgTimeOffset(int epgTimeOffset)
+{
+	KSharedConfig::openConfig()->group("DVB").writeEntry("EpgTimeOffset", epgTimeOffset);
 }
 
 void DvbManager::setNamingFormat(QString namingFormat)

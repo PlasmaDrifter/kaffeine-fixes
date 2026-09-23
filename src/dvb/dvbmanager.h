@@ -136,6 +136,7 @@ public:
 	QString getActionAfterRecording() const;
 	int getBeginMargin() const; // seconds
 	int getEndMargin() const; // seconds
+	int getEpgTimeOffset() const; // hours
 	bool override6937Charset() const;
 	bool createInfoFile() const;
 	bool disableEpg() const;
@@ -154,6 +155,7 @@ public:
 	void setActionAfterRecording(const QString actionAfterRecording);
 	void setBeginMargin(int beginMargin); // seconds
 	void setEndMargin(int endMargin); // seconds
+	void setEpgTimeOffset(int epgTimeOffset); // hours
 	void setOverride6937Charset(bool override);
 	void setCreateInfoFile(bool createInfoFile);
 	void setDisableEpg(bool disableEpg);

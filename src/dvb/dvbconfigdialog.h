@@ -104,6 +104,7 @@ private:
 	QLineEdit *xmltvFileNameEdit;
 	QSpinBox *beginMarginBox;
 	QSpinBox *endMarginBox;
+	QSpinBox *epgTimeOffsetBox;
 	QLineEdit *namingFormat;
 	QCheckBox *override6937CharsetBox;
 	QCheckBox *createInfoFileBox;

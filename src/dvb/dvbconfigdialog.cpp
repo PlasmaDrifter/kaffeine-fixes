@@ -134,6 +134,13 @@ DvbConfigDialog::DvbConfigDialog(DvbManager *manager_, QWidget *parent) : QDialo
 	endMarginBox->setValue(manager->getEndMargin() / 60);
 	gridLayout->addWidget(endMarginBox, line++, 1);
 
+	gridLayout->addWidget(new QLabel(i18n("EPG time offset (hours):")), line, 0);
+
+	epgTimeOffsetBox = new QSpinBox(widget);
+	epgTimeOffsetBox->setRange(-12, 12);
+	epgTimeOffsetBox->setValue(manager->getEpgTimeOffset());
+	gridLayout->addWidget(epgTimeOffsetBox, line++, 1);
+
 	gridLayout->addWidget(new QLabel(i18n("Naming style for recordings:")), line, 0);
 
 	namingFormat = new QLineEdit(widget);
@@ -577,6 +584,7 @@ void DvbConfigDialog::accept()
 	manager->setActionAfterRecording(actionAfterRecordingLineEdit->text());
 	manager->setBeginMargin(beginMarginBox->value() * 60);
 	manager->setEndMargin(endMarginBox->value() * 60);
+	manager->setEpgTimeOffset(epgTimeOffsetBox->value());
 	manager->setOverride6937Charset(override6937CharsetBox->isChecked());
 	manager->setCreateInfoFile(createInfoFileBox->isChecked());
 	manager->setDisableEpg(disableEpgBox->isChecked());

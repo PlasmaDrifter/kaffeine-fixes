@@ -1062,6 +1062,9 @@ void DvbEpgFilter::processSection(const char *data, int size)
 		else
 			epgEntry.begin = QDateTime(QDate::fromJulianDay(entry.startDate() + 2400001),
 						   bcdToTime(entry.startTime()), Qt::UTC);
+		if (manager->getEpgTimeOffset() != 0) {
+			epgEntry.begin = epgEntry.begin.addSecs(manager->getEpgTimeOffset() * 3600);
+		}
 		epgEntry.duration = bcdToTime(entry.duration());
 
 		for (DvbDescriptor descriptor = entry.descriptors(); descriptor.isValid();
@@ -1140,9 +1143,9 @@ void AtscEpgEttFilter::processSection(const char *data, int size)
 	epgFilter->processEttSection(data, size);
 }
 
-AtscEpgFilter::AtscEpgFilter(DvbManager *manager, DvbDevice *device_,
+AtscEpgFilter::AtscEpgFilter(DvbManager *manager_, DvbDevice *device_,
 	const DvbSharedChannel &channel) : device(device_), mgtFilter(this), eitFilter(this),
-	ettFilter(this)
+	ettFilter(this), manager(manager_)
 {
 	source = channel->source;
 	transponder = channel->transponder;
@@ -1280,6 +1283,7 @@ void AtscEpgFilter::processEitSection(const char *data, int size)
 	int entryCount = eitSection.entryCount();
 	// 1980-01-06T000000 minus 15 secs (= UTC - GPS in 2011)
 	QDateTime baseDateTime = QDateTime(QDate(1980, 1, 5), QTime(23, 59, 45), Qt::UTC);
+	int offsetSecs = manager->getEpgTimeOffset() * 3600;
 
 	AtscEitSectionEntry eitEntry = eitSection.entries();
 	for (int i = 0; i < entryCount; i++) {
@@ -1287,7 +1291,7 @@ void AtscEpgFilter::processEitSection(const char *data, int size)
 			break;
 		DvbEpgEntry epgEntry;
 		epgEntry.channel = channel;
-		epgEntry.begin = baseDateTime.addSecs(eitEntry.startTime());
+		epgEntry.begin = baseDateTime.addSecs(eitEntry.startTime() + offsetSecs);
 		epgEntry.duration = QTime(0, 0, 0).addSecs(eitEntry.duration());
 
 
