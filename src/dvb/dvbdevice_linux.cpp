@@ -98,7 +98,7 @@ bool DvbLinuxDevice::isReady() const
 void DvbLinuxDevice::startDevice(const QString &deviceId_)
 {
 	Q_ASSERT(!ready);
-	struct dvb_v5_fe_parms *parms = dvb_fe_open2(adapter, index, verbose, 0, dvbv5_log);
+	struct dvb_v5_fe_parms *parms = dvb_fe_open_flags(adapter, index, verbose, 0, dvbv5_log, O_RDWR | O_CLOEXEC);
 
 	if (!parms) {
 		qCWarning(logDev, "Cannot open frontend %s", qPrintable(frontendPath));
@@ -267,7 +267,7 @@ void DvbLinuxDevice::setDeviceEnabled(bool enabled_)
 bool DvbLinuxDevice::acquire()
 {
 	Q_ASSERT(enabled && (!dvbv5_parms) && (dvrFd < 0));
-	dvbv5_parms = dvb_fe_open2(adapter, index, verbose, 0, dvbv5_log);
+	dvbv5_parms = dvb_fe_open_flags(adapter, index, verbose, 0, dvbv5_log, O_RDWR | O_CLOEXEC);
 
 	if (!dvbv5_parms) {
 		qCWarning(logDev, "Cannot open frontend %s", qPrintable(frontendPath));
