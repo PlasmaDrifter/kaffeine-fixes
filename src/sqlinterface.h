@@ -84,19 +84,22 @@ public:
 
 	template<class Container> SqlKey sqlFindFreeKey(const Container &container) const
 	{
-		SqlKey sqlKey(1);
-
-		if (!container.isEmpty()) {
-			sqlKey = SqlKey(std::prev(container.constEnd(), -1).key().sqlKey + 1);
-
-			while (container.contains(sqlKey) || !sqlKey.isSqlKeyValid()) {
-#if QT_VERSION >= 0x050a00
-				quint32 rand = QRandomGenerator::global()->generate();
-#else
-				quint32 rand = qrand();
-#endif
-				sqlKey = SqlKey(rand);
+		quint32 maxKey = 0;
+		for (auto it = container.constBegin(); it != container.constEnd(); ++it) {
+			if (it.key().sqlKey > maxKey) {
+				maxKey = it.key().sqlKey;
 			}
+		}
+
+		SqlKey sqlKey(maxKey + 1);
+
+		while (container.contains(sqlKey) || !sqlKey.isSqlKeyValid()) {
+#if QT_VERSION >= 0x050a00
+			quint32 rand = QRandomGenerator::global()->generate();
+#else
+			quint32 rand = qrand();
+#endif
+			sqlKey = SqlKey(rand);
 		}
 
 		return sqlKey;
