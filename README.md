@@ -19,9 +19,13 @@ A patched fork of [KDE Kaffeine](https://invent.kde.org/multimedia/kaffeine) 2.0
   > *"Didn't find a device with valid settings or access permissions are wrong. Please check the Configure Television window."*
 - **Fix**: Switched frontend opening to `dvb_fe_open_flags(..., O_RDWR | O_CLOEXEC)` so background workers never inherit or lock tuner hardware.
 
-### 4. Program Guide (EPG) 1 Hour Early in Non-DST Zones (e.g. Arizona)
+### 4. Program Guide (EPG) Time Offset (Non-DST / Arizona Support)
 - **Bug**: Broadcasters often transmit ATSC EIT schedule timestamps referenced to GPS/UTC assuming Daylight Saving Time (e.g., MDT UTC-6). In regions that do not observe DST (such as Arizona, `America/Phoenix` UTC-7), converting the timestamp to local time causes all programs to display 1 hour too early (e.g., 7:00 PM shows display at 6:00 PM). Kaffeine previously lacked any EPG time offset option.
 - **Fix**: Added a configurable **"EPG time offset (hours)"** setting (`-12` to `+12` hours) accessible in **Television → Configure Television**, persisting to `~/.config/kaffeinerc` (`EpgTimeOffset`).
+
+### 5. Program Guide Entries Disappearing in Table View
+- **Bug**: In `src/tablemodel.h`, `binaryFind()` utilized `std::lower_bound` to locate items by sorting key without verifying item equality (`items.at(row) == item`). When transport stream packets arrived over the air for multiplexed sibling channels on the same RF frequency, `update()` failed the active channel filter and executed `items.removeAt(row)`, inadvertently deleting valid entries from the open guide table view one by one. In addition, changing the EPG time offset did not refresh existing entries or the on-disk cache.
+- **Fix**: Added `findItemRow()` to enforce item equality before updating or removing rows, added automatic cache clearing upon changing the EPG time offset, and provided a manual "Clear EPG Data" button in Configure Television.
 
 ---
 

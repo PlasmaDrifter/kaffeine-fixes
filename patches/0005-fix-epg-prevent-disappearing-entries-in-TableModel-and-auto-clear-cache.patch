@@ -1,0 +1,198 @@
+From e5d002156f8a3e122e72b816dbda241685fa2f5c Mon Sep 17 00:00:00 2001
+From: PlasmaDrifter <118319137+PlasmaDrifter@users.noreply.github.com>
+Date: Sun, 27 Sep 2026 09:06:40 -0700
+Subject: [PATCH] fix(epg): prevent disappearing entries in TableModel and
+ auto-clear cache on offset change
+
+---
+ .gitignore                  |  1 +
+ src/dvb/dvbconfigdialog.cpp |  9 ++++++++-
+ src/dvb/dvbepg.cpp          | 21 +++++++++++++++++++--
+ src/dvb/dvbepg.h            |  1 +
+ src/dvb/dvbmanager.cpp      |  7 ++++++-
+ src/tablemodel.h            | 35 ++++++++++++++++++++++++++---------
+ 6 files changed, 61 insertions(+), 13 deletions(-)
+
+diff --git a/.gitignore b/.gitignore
+index b98107a..b968181 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -22,3 +22,4 @@ moc*.cpp
+ src/kaffeine
+ src/kaffeine.qrc.depends
+ src/qrc_kaffeine.cpp
++build/
+diff --git a/src/dvb/dvbconfigdialog.cpp b/src/dvb/dvbconfigdialog.cpp
+index 17bef3c..1b4fc85 100644
+--- a/src/dvb/dvbconfigdialog.cpp
++++ b/src/dvb/dvbconfigdialog.cpp
+@@ -50,6 +50,7 @@
+ #include "dvbconfig.h"
+ #include "dvbconfigdialog.h"
+ #include "dvbdevice.h"
++#include "dvbepg.h"
+ #include "dvbmanager.h"
+ #include "dvbrecording.h"
+ 
+@@ -139,7 +140,13 @@ DvbConfigDialog::DvbConfigDialog(DvbManager *manager_, QWidget *parent) : QDialo
+ 	epgTimeOffsetBox = new QSpinBox(widget);
+ 	epgTimeOffsetBox->setRange(-12, 12);
+ 	epgTimeOffsetBox->setValue(manager->getEpgTimeOffset());
+-	gridLayout->addWidget(epgTimeOffsetBox, line++, 1);
++	gridLayout->addWidget(epgTimeOffsetBox, line, 1);
++
++	QPushButton *clearEpgButton = new QPushButton(i18n("Clear EPG Data"), widget);
++	connect(clearEpgButton, &QPushButton::clicked, this, [this]() {
++		manager->getEpgModel()->clear();
++	});
++	gridLayout->addWidget(clearEpgButton, line++, 2);
+ 
+ 	gridLayout->addWidget(new QLabel(i18n("Naming style for recordings:")), line, 0);
+ 
+diff --git a/src/dvb/dvbepg.cpp b/src/dvb/dvbepg.cpp
+index dd9fa82..c38dba1 100644
+--- a/src/dvb/dvbepg.cpp
++++ b/src/dvb/dvbepg.cpp
+@@ -598,6 +598,23 @@ DvbEpgModel::Iterator DvbEpgModel::removeEntry(Iterator it)
+ 	return entries.erase(it);
+ }
+ 
++void DvbEpgModel::clear()
++{
++	if (hasPendingOperation) {
++		qCWarning(logEpg, "Illegal recursive call");
++		return;
++	}
++
++	EnsureNoPendingOperation ensureNoPendingOperation(hasPendingOperation);
++	Iterator it = entries.begin();
++
++	while (ConstIterator(it) != entries.constEnd()) {
++		it = removeEntry(it);
++	}
++
++	QFile::remove(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + QLatin1String("/epgdata.dvb"));
++}
++
+ DvbEpgFilter::DvbEpgFilter(DvbManager *manager_, DvbDevice *device_,
+ 	const DvbSharedChannel &channel) : device(device_)
+ {
+@@ -1144,8 +1161,8 @@ void AtscEpgEttFilter::processSection(const char *data, int size)
+ }
+ 
+ AtscEpgFilter::AtscEpgFilter(DvbManager *manager_, DvbDevice *device_,
+-	const DvbSharedChannel &channel) : device(device_), mgtFilter(this), eitFilter(this),
+-	ettFilter(this), manager(manager_)
++	const DvbSharedChannel &channel) : device(device_), manager(manager_),
++	mgtFilter(this), eitFilter(this), ettFilter(this)
+ {
+ 	source = channel->source;
+ 	transponder = channel->transponder;
+diff --git a/src/dvb/dvbepg.h b/src/dvb/dvbepg.h
+index 4187810..9bf802c 100644
+--- a/src/dvb/dvbepg.h
++++ b/src/dvb/dvbepg.h
+@@ -278,6 +278,7 @@ public:
+ 
+ 	void startEventFilter(DvbDevice *device, const DvbSharedChannel &channel);
+ 	void stopEventFilter(DvbDevice *device, const DvbSharedChannel &channel);
++	void clear();
+ 
+ signals:
+ 	void entryAdded(const DvbSharedEpgEntry &entry);
+diff --git a/src/dvb/dvbmanager.cpp b/src/dvb/dvbmanager.cpp
+index bc97836..c3665c1 100644
+--- a/src/dvb/dvbmanager.cpp
++++ b/src/dvb/dvbmanager.cpp
+@@ -449,7 +449,12 @@ void DvbManager::setEndMargin(int endMargin)
+ 
+ void DvbManager::setEpgTimeOffset(int epgTimeOffset)
+ {
+-	KSharedConfig::openConfig()->group("DVB").writeEntry("EpgTimeOffset", epgTimeOffset);
++	if (getEpgTimeOffset() != epgTimeOffset) {
++		KSharedConfig::openConfig()->group("DVB").writeEntry("EpgTimeOffset", epgTimeOffset);
++		if (epgModel != NULL) {
++			epgModel->clear();
++		}
++	}
+ }
+ 
+ void DvbManager::setNamingFormat(QString namingFormat)
+diff --git a/src/tablemodel.h b/src/tablemodel.h
+index 86023b7..5f5d5aa 100644
+--- a/src/tablemodel.h
++++ b/src/tablemodel.h
+@@ -35,9 +35,9 @@ public:
+ 	QModelIndex find(const ItemType &item) const
+ 	{
+ 		if (item.isValid()) {
+-			int row = binaryFind(item);
++			int row = findItemRow(item);
+ 
+-			if (row < items.size()) {
++			if (row >= 0) {
+ 				return index(row, 0);
+ 			}
+ 		}
+@@ -133,7 +133,7 @@ protected:
+ 		updatingRow = -1;
+ 
+ 		if (item.isValid()) {
+-			updatingRow = binaryFind(item);
++			updatingRow = findItemRow(item);
+ 		}
+ 	}
+ 
+@@ -178,10 +178,12 @@ protected:
+ 	void remove(const ItemType &item)
+ 	{
+ 		if (item.isValid()) {
+-			int row = binaryFind(item);
+-			beginRemoveRows(QModelIndex(), row, row);
+-			items.removeAt(row);
+-			endRemoveRows();
++			int row = findItemRow(item);
++			if (row >= 0) {
++				beginRemoveRows(QModelIndex(), row, row);
++				items.removeAt(row);
++				endRemoveRows();
++			}
+ 		}
+ 	}
+ 
+@@ -202,6 +204,17 @@ private:
+ 			items.constBegin());
+ 	}
+ 
++	int findItemRow(const ItemType &item) const
++	{
++		int row = binaryFind(item);
++
++		if ((row >= 0) && (row < items.size()) && (items.at(row) == item)) {
++			return row;
++		}
++
++		return -1;
++	}
++
+ 	int upperBound(const ItemType &item) const
+ 	{
+ 		return (std::upper_bound(items.constBegin(), items.constEnd(), item, lessThan) -
+@@ -232,8 +245,12 @@ private:
+ 			const ItemType &item = persistentItems.at(i);
+ 
+ 			if (item.isValid()) {
+-				int row = binaryFind(item);
+-				newPersistentIndexes.append(index(row, oldIndex.column()));
++				int row = findItemRow(item);
++				if (row >= 0) {
++					newPersistentIndexes.append(index(row, oldIndex.column()));
++				} else {
++					newPersistentIndexes.append(QModelIndex());
++				}
+ 			} else {
+ 				newPersistentIndexes.append(QModelIndex());
+ 			}
+-- 
+2.55.0
+
