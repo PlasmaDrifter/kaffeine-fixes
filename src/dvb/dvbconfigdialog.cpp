@@ -50,6 +50,7 @@
 #include "dvbconfig.h"
 #include "dvbconfigdialog.h"
 #include "dvbdevice.h"
+#include "dvbepg.h"
 #include "dvbmanager.h"
 #include "dvbrecording.h"
 
@@ -139,7 +140,13 @@ DvbConfigDialog::DvbConfigDialog(DvbManager *manager_, QWidget *parent) : QDialo
 	epgTimeOffsetBox = new QSpinBox(widget);
 	epgTimeOffsetBox->setRange(-12, 12);
 	epgTimeOffsetBox->setValue(manager->getEpgTimeOffset());
-	gridLayout->addWidget(epgTimeOffsetBox, line++, 1);
+	gridLayout->addWidget(epgTimeOffsetBox, line, 1);
+
+	QPushButton *clearEpgButton = new QPushButton(i18n("Clear EPG Data"), widget);
+	connect(clearEpgButton, &QPushButton::clicked, this, [this]() {
+		manager->getEpgModel()->clear();
+	});
+	gridLayout->addWidget(clearEpgButton, line++, 2);
 
 	gridLayout->addWidget(new QLabel(i18n("Naming style for recordings:")), line, 0);
 

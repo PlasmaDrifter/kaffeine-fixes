@@ -449,7 +449,12 @@ void DvbManager::setEndMargin(int endMargin)
 
 void DvbManager::setEpgTimeOffset(int epgTimeOffset)
 {
-	KSharedConfig::openConfig()->group("DVB").writeEntry("EpgTimeOffset", epgTimeOffset);
+	if (getEpgTimeOffset() != epgTimeOffset) {
+		KSharedConfig::openConfig()->group("DVB").writeEntry("EpgTimeOffset", epgTimeOffset);
+		if (epgModel != NULL) {
+			epgModel->clear();
+		}
+	}
 }
 
 void DvbManager::setNamingFormat(QString namingFormat)

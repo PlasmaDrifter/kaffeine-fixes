@@ -35,9 +35,9 @@ public:
 	QModelIndex find(const ItemType &item) const
 	{
 		if (item.isValid()) {
-			int row = binaryFind(item);
+			int row = findItemRow(item);
 
-			if (row < items.size()) {
+			if (row >= 0) {
 				return index(row, 0);
 			}
 		}
@@ -133,7 +133,7 @@ protected:
 		updatingRow = -1;
 
 		if (item.isValid()) {
-			updatingRow = binaryFind(item);
+			updatingRow = findItemRow(item);
 		}
 	}
 
@@ -178,10 +178,12 @@ protected:
 	void remove(const ItemType &item)
 	{
 		if (item.isValid()) {
-			int row = binaryFind(item);
-			beginRemoveRows(QModelIndex(), row, row);
-			items.removeAt(row);
-			endRemoveRows();
+			int row = findItemRow(item);
+			if (row >= 0) {
+				beginRemoveRows(QModelIndex(), row, row);
+				items.removeAt(row);
+				endRemoveRows();
+			}
 		}
 	}
 
@@ -200,6 +202,17 @@ private:
 	{
 		return (std::lower_bound(items.constBegin(), items.constEnd(), item, lessThan) -
 			items.constBegin());
+	}
+
+	int findItemRow(const ItemType &item) const
+	{
+		int row = binaryFind(item);
+
+		if ((row >= 0) && (row < items.size()) && (items.at(row) == item)) {
+			return row;
+		}
+
+		return -1;
 	}
 
 	int upperBound(const ItemType &item) const
@@ -232,8 +245,12 @@ private:
 			const ItemType &item = persistentItems.at(i);
 
 			if (item.isValid()) {
-				int row = binaryFind(item);
-				newPersistentIndexes.append(index(row, oldIndex.column()));
+				int row = findItemRow(item);
+				if (row >= 0) {
+					newPersistentIndexes.append(index(row, oldIndex.column()));
+				} else {
+					newPersistentIndexes.append(QModelIndex());
+				}
 			} else {
 				newPersistentIndexes.append(QModelIndex());
 			}

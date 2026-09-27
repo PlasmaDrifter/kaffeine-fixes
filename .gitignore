@@ -22,3 +22,4 @@ moc*.cpp
 src/kaffeine
 src/kaffeine.qrc.depends
 src/qrc_kaffeine.cpp
+build/

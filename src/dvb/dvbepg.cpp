@@ -598,6 +598,23 @@ DvbEpgModel::Iterator DvbEpgModel::removeEntry(Iterator it)
 	return entries.erase(it);
 }
 
+void DvbEpgModel::clear()
+{
+	if (hasPendingOperation) {
+		qCWarning(logEpg, "Illegal recursive call");
+		return;
+	}
+
+	EnsureNoPendingOperation ensureNoPendingOperation(hasPendingOperation);
+	Iterator it = entries.begin();
+
+	while (ConstIterator(it) != entries.constEnd()) {
+		it = removeEntry(it);
+	}
+
+	QFile::remove(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + QLatin1String("/epgdata.dvb"));
+}
+
 DvbEpgFilter::DvbEpgFilter(DvbManager *manager_, DvbDevice *device_,
 	const DvbSharedChannel &channel) : device(device_)
 {
@@ -1144,8 +1161,8 @@ void AtscEpgEttFilter::processSection(const char *data, int size)
 }
 
 AtscEpgFilter::AtscEpgFilter(DvbManager *manager_, DvbDevice *device_,
-	const DvbSharedChannel &channel) : device(device_), mgtFilter(this), eitFilter(this),
-	ettFilter(this), manager(manager_)
+	const DvbSharedChannel &channel) : device(device_), manager(manager_),
+	mgtFilter(this), eitFilter(this), ettFilter(this)
 {
 	source = channel->source;
 	transponder = channel->transponder;

@@ -278,6 +278,7 @@ public:
 
 	void startEventFilter(DvbDevice *device, const DvbSharedChannel &channel);
 	void stopEventFilter(DvbDevice *device, const DvbSharedChannel &channel);
+	void clear();
 
 signals:
 	void entryAdded(const DvbSharedEpgEntry &entry);
