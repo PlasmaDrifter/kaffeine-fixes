@@ -1,6 +1,6 @@
 # Kaffeine Fixes (2.0.19)
 
-A patched fork of [KDE Kaffeine](https://invent.kde.org/multimedia/kaffeine) 2.0.19 resolving critical bugs related to modern desktop environments (Wayland), digital TV tuners (ATSC/DVB), and program schedule timing.
+A patched fork of [KDE Kaffeine](https://invent.kde.org/multimedia/kaffeine) 2.0.19 that fixes the bug that crashes Kaffeine when adding channels, alongside critical fixes for modern desktop environments (Wayland), digital TV tuners (ATSC/DVB), and program schedule timing.
 
 ---
 
