@@ -5,6 +5,9 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   Ubuntu:
     name: Ubuntu
@@ -13,7 +16,7 @@ jobs:
       matrix:
         arch: [x64_64, aarch64]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: prepare
         run: |
           sudo apt-get update
