@@ -185,6 +185,14 @@ void KaffeineApplication::activateRequested(const QStringList &arguments,
 {
 	parser.parse(arguments);
 
+	if (mainWindow) {
+		if (mainWindow->isMinimized()) {
+			mainWindow->showNormal();
+		}
+		mainWindow->show();
+		mainWindow->raise();
+	}
+
 #if KWINDOWSYSTEM_VERSION > QT_VERSION_CHECK(5, 91, 0)
 	KWindowSystem::updateStartupId(mainWindow->windowHandle());
 	KWindowSystem::activateWindow(mainWindow->windowHandle());
