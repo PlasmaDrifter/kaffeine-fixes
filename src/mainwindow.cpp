@@ -722,11 +722,13 @@ void MainWindow::displayModeChanged()
 		break;
 	case MediaWidget::NormalMode:
 		menuBar()->show();
+		menuBar()->update();
 		navigationBar->show();
 		controlBar->show();
 		autoHideControlBar = false;
 		cursorHideTimer->stop();
 		unsetCursor();
+		update();
 		break;
 	}
 	tabs.at(currentTabIndex)->toggleDisplayMode(displayMode);

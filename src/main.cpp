@@ -191,6 +191,7 @@ void KaffeineApplication::activateRequested(const QStringList &arguments,
 		}
 		mainWindow->show();
 		mainWindow->raise();
+		mainWindow->update();
 	}
 
 #if KWINDOWSYSTEM_VERSION > QT_VERSION_CHECK(5, 91, 0)
