@@ -21,16 +21,21 @@
 #include "log.h"
 
 #include <KAboutData>
+#include <KColorScheme>
+#include <KConfigGroup>
 #include <KDBusService>
+#include <KSharedConfig>
 #include <KStartupInfo>
 #include <KWindowSystem>
 #include <QApplication>
 #include <QCommandLineParser>
 #include <QDateTime>
 #include <QDir>
+#include <QFile>
 #include <QPointer>
 #include <QStandardPaths>
 #include <QString>
+#include <QStyleFactory>
 
 #include <kwindowsystem_version.h>
 
@@ -232,6 +237,39 @@ int main(int argc, char *argv[])
 	app.parser.process(app);
 
 	aboutData->processCommandLine(&app.parser);
+
+	// Apply Breeze widget style
+	QStyle *breezeStyle = QStyleFactory::create(QStringLiteral("Breeze"));
+	if (breezeStyle) {
+		app.setStyle(breezeStyle);
+	}
+
+	// Apply color scheme
+	KSharedConfigPtr colorConfig;
+	if (app.parser.isSet("light")) {
+		if (QFile::exists(QStringLiteral("/usr/share/color-schemes/BreezeLight.colors"))) {
+			colorConfig = KSharedConfig::openConfig(QStringLiteral("/usr/share/color-schemes/BreezeLight.colors"));
+		} else {
+			colorConfig = KSharedConfig::openConfig();
+		}
+	} else if (app.parser.isSet("dark")) {
+		if (QFile::exists(QStringLiteral("/usr/share/color-schemes/BreezeDark.colors"))) {
+			colorConfig = KSharedConfig::openConfig(QStringLiteral("/usr/share/color-schemes/BreezeDark.colors"));
+		} else {
+			colorConfig = KSharedConfig::openConfig();
+		}
+	} else {
+		colorConfig = KSharedConfig::openConfig();
+		QString schemeName = colorConfig->group("General").readEntry("ColorScheme", QString());
+		if (schemeName.isEmpty()) {
+			schemeName = colorConfig->group("Colors:Window").readEntry("ColorScheme", QString());
+		}
+		if (schemeName.contains(QLatin1String("Dark"), Qt::CaseInsensitive) &&
+		    QFile::exists(QStringLiteral("/usr/share/color-schemes/BreezeDark.colors"))) {
+			colorConfig = KSharedConfig::openConfig(QStringLiteral("/usr/share/color-schemes/BreezeDark.colors"));
+		}
+	}
+	app.setPalette(KColorScheme::createApplicationPalette(colorConfig));
 
 	const KDBusService service(KDBusService::Unique);
 

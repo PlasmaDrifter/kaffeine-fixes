@@ -466,6 +466,7 @@ void MainWindow::writeSettings()
 {
     QSettings settings(QCoreApplication::organizationName(), QCoreApplication::applicationName());
     settings.setValue("geometry", saveGeometry());
+    settings.setValue("activeTab", currentTabIndex);
 }
 
 MainWindow::MainWindow(KAboutData *aboutData, QCommandLineParser *parser)
@@ -482,12 +483,15 @@ MainWindow::MainWindow(KAboutData *aboutData, QCommandLineParser *parser)
 	parser->addOption(QCommandLineOption(QStringList() << QLatin1String("videocd"), i18n("Play Video CD")));
 	parser->addOption(QCommandLineOption(QStringList() << QLatin1String("dvd"), i18n("Play DVD")));
 	parser->addOption(QCommandLineOption(QStringList() << QLatin1String("aspectratio"), "Force starting with an specific aspect ratio", QLatin1String("aspect ratio")));
+	parser->addOption(QCommandLineOption(QStringList() << QLatin1String("dark"), i18n("Force dark theme (Breeze Dark)")));
+	parser->addOption(QCommandLineOption(QStringList() << QLatin1String("light"), i18n("Force light theme")));
 
 #if HAVE_DVB == 1
 	parser->addOption(QCommandLineOption(QStringList() << QLatin1String("dumpdvb"), i18nc("command line option", "Dump dvb data (debug option)")));
 	parser->addOption(QCommandLineOption(QStringList() << QLatin1String("channel"), i18nc("command line option", "Play TV channel"), QLatin1String("name / number")));
 	parser->addOption(QCommandLineOption(QStringList() << QLatin1String("tv"), i18nc("command line option", "(deprecated option)"), QLatin1String("channel")));
 	parser->addOption(QCommandLineOption(QStringList() << QLatin1String("lastchannel"), i18nc("command line option", "Play last tuned TV channel")));
+	parser->addOption(QCommandLineOption(QStringList() << QLatin1String("television"), i18nc("command line option", "Open Television tab on startup")));
 #endif
 	parser->addPositionalArgument(QLatin1String("[file]"), i18n("Files or URLs to play"));
 }
@@ -601,6 +605,11 @@ void MainWindow::parseArgs(const QString workingDirectory)
 
 		return;
 	}
+
+	if (parser->isSet("television")) {
+		activateTab(DvbTabId);
+		return;
+	}
 #endif /* HAVE_DVB == 1 */
 
 	if (parser->isSet("audiocd")) {
@@ -653,6 +662,37 @@ void MainWindow::parseArgs(const QString workingDirectory)
 		}
 		return;
 	}
+
+#if HAVE_DVB == 1
+	switch (Configuration::instance()->getStartupTab()) {
+	case Configuration::StartupTabStart:
+		break;
+	case Configuration::StartupTabTelevision:
+		activateTab(DvbTabId);
+		break;
+	case Configuration::StartupTabRememberLast: {
+		QSettings settings(QCoreApplication::organizationName(), QCoreApplication::applicationName());
+		int activeTab = settings.value("activeTab", DvbTabId).toInt();
+		if (activeTab >= 0 && activeTab < tabs.size()) {
+			activateTab(activeTab);
+		}
+		break;
+	}
+	}
+#else
+	switch (Configuration::instance()->getStartupTab()) {
+	case Configuration::StartupTabRememberLast: {
+		QSettings settings(QCoreApplication::organizationName(), QCoreApplication::applicationName());
+		int activeTab = settings.value("activeTab", StartTabId).toInt();
+		if (activeTab >= 0 && activeTab < tabs.size()) {
+			activateTab(activeTab);
+		}
+		break;
+	}
+	default:
+		break;
+	}
+#endif
 }
 
 void MainWindow::displayModeChanged()

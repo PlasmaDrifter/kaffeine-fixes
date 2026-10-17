@@ -38,6 +38,16 @@ Configuration::Configuration()
 		qCWarning(logConfig, "Unknown startup display mode %d", value);
 	}
 
+	startupTab = StartupTabTelevision;
+	value = KSharedConfig::openConfig()->group("MainWindow").readEntry("StartupTab",
+		static_cast<int>(startupTab));
+
+	if ((value >= 0) && (value <= StartupTabLastValue)) {
+		startupTab = static_cast<StartupTab>(value);
+	} else {
+		qCWarning(logConfig, "Unknown startup tab %d", value);
+	}
+
 	shortSkipDuration =
 		KSharedConfig::openConfig()->group("MediaObject").readEntry("ShortSkipDuration", 15);
 	longSkipDuration =
@@ -76,6 +86,17 @@ void Configuration::setStartupDisplayMode(int newStartupDisplayMode)
 			static_cast<int>(startupDisplayMode));
 	} else {
 		qCWarning(logConfig, "Unknown startup display mode %d", newStartupDisplayMode);
+	}
+}
+
+void Configuration::setStartupTab(int newStartupTab)
+{
+	if ((newStartupTab >= 0) && (newStartupTab <= StartupTabLastValue)) {
+		startupTab = static_cast<StartupTab>(newStartupTab);
+		KSharedConfig::openConfig()->group("MainWindow").writeEntry("StartupTab",
+			static_cast<int>(startupTab));
+	} else {
+		qCWarning(logConfig, "Unknown startup tab %d", newStartupTab);
 	}
 }
 

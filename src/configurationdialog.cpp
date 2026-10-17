@@ -60,24 +60,35 @@ ConfigurationDialog::ConfigurationDialog(QWidget *parent) : KPageDialog(parent)
 	label->setBuddy(startupDisplayModeBox);
 	gridLayout->addWidget(label, 0, 0);
 
+	startupTabBox = new QComboBox(widget);
+	startupTabBox->addItem(i18nc("@item:inlistbox 'Startup tab:'", "Start Screen"));
+	startupTabBox->addItem(i18nc("@item:inlistbox 'Startup tab:'", "Television"));
+	startupTabBox->addItem(i18nc("@item:inlistbox 'Startup tab:'", "Remember Last Tab"));
+	startupTabBox->setCurrentIndex(Configuration::instance()->getStartupTab());
+	gridLayout->addWidget(startupTabBox, 1, 1);
+
+	label = new QLabel(i18nc("@label:listbox", "Startup tab:"), widget);
+	label->setBuddy(startupTabBox);
+	gridLayout->addWidget(label, 1, 0);
+
 	shortSkipBox = new QSpinBox(widget);
 	shortSkipBox->setRange(1, 600);
 	shortSkipBox->setValue(Configuration::instance()->getShortSkipDuration());
-	gridLayout->addWidget(shortSkipBox, 1, 1);
+	gridLayout->addWidget(shortSkipBox, 2, 1);
 
 	label = new QLabel(i18nc("@label:spinbox", "Short skip duration:"), widget);
 	label->setBuddy(shortSkipBox);
-	gridLayout->addWidget(label, 1, 0);
+	gridLayout->addWidget(label, 2, 0);
 
 	longSkipBox = new QSpinBox(widget);
 	longSkipBox->setRange(1, 600);
 	longSkipBox->setValue(Configuration::instance()->getLongSkipDuration());
-	gridLayout->addWidget(longSkipBox, 2, 1);
+	gridLayout->addWidget(longSkipBox, 3, 1);
 
 	label = new QLabel(i18nc("@label:spinbox", "Long skip duration:"), widget);
 	label->setBuddy(longSkipBox);
-	gridLayout->addWidget(label, 2, 0);
-	gridLayout->setRowStretch(3, 1);
+	gridLayout->addWidget(label, 3, 0);
+	gridLayout->setRowStretch(4, 1);
 
 	KPageWidgetItem *page = new KPageWidgetItem(widget, i18nc("@title:group", "General"));
 	page->setIcon(QIcon::fromTheme(QLatin1String("configure"), QIcon(":configure")));
@@ -138,6 +149,7 @@ void ConfigurationDialog::accept()
 {
 	Configuration *configuration = Configuration::instance();
 	configuration->setStartupDisplayMode(startupDisplayModeBox->currentIndex());
+	configuration->setStartupTab(startupTabBox->currentIndex());
 	configuration->setShortSkipDuration(shortSkipBox->value());
 	configuration->setLongSkipDuration(longSkipBox->value());
 	configuration->setLibVlcArguments(libVlcArguments->text());

@@ -49,6 +49,20 @@ public:
 
 	void setStartupDisplayMode(int newStartupDisplayMode);
 
+	enum StartupTab {
+		StartupTabStart = 0,
+		StartupTabTelevision = 1,
+		StartupTabRememberLast = 2,
+		StartupTabLastValue = StartupTabRememberLast
+	};
+
+	StartupTab getStartupTab() const
+	{
+		return startupTab;
+	}
+
+	void setStartupTab(int newStartupTab);
+
 	int getShortSkipDuration() const
 	{
 		return shortSkipDuration;
@@ -79,6 +93,7 @@ private:
 	static Configuration *globalInstance;
 
 	StartupDisplayMode startupDisplayMode;
+	StartupTab startupTab;
 	int shortSkipDuration;
 	int longSkipDuration;
 	QString libVlcArguments;

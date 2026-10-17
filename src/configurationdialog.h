@@ -60,6 +60,7 @@ private slots:
 
 private:
 	QComboBox *startupDisplayModeBox;
+	QComboBox *startupTabBox;
 	QSpinBox *shortSkipBox;
 	QSpinBox *longSkipBox;
 	QLineEdit *libVlcArguments;

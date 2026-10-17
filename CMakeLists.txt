@@ -53,6 +53,7 @@ find_package(KF5 ${KF5_MIN_VERSION} REQUIRED COMPONENTS
 	KIO		# KFileWidget
 	Solid
 	DBusAddons
+	ConfigWidgets   # KColorScheme
 )
 find_package(KF5DocTools ${KF5_MIN_VERSION} QUIET)
 
