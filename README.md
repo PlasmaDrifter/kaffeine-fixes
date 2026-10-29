@@ -74,6 +74,23 @@ cp src/kaffeine ~/.local/bin/kaffeine
 
 ---
 
+## Updating
+
+### Pre-compiled Binary
+Download the latest release tarball from [Releases](https://github.com/PlasmaDrifter/kaffeine-fixes/releases), extract it, and re-run `./install.sh`.
+
+### From Source
+```bash
+cd kaffeine-fixes
+git pull
+cd build
+cmake -DCMAKE_BUILD_TYPE=Release ..
+make -j$(nproc)
+cp src/kaffeine ~/.local/bin/kaffeine
+```
+
+---
+
 ## License
 Kaffeine is licensed under the [GNU General Public License v2 (GPL-2.0)](COPYING).
 
